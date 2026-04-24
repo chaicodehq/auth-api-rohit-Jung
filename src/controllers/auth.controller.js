@@ -1,6 +1,6 @@
-import bcrypt from 'bcryptjs';
-import { User } from '../models/user.model.js';
-import { signToken } from '../utils/jwt.js';
+import bcrypt from "bcryptjs";
+import { User } from "../models/user.model.js";
+import { signToken } from "../utils/jwt.js";
 
 /**
  * TODO: Register a new user
@@ -14,6 +14,24 @@ import { signToken } from '../utils/jwt.js';
 export async function register(req, res, next) {
   try {
     // Your code here
+    const { name, email, password, role } = req.body;
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({
+        error: { message: "Email already exists" },
+      });
+    }
+
+    // you do not hash because of presave hook
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role,
+    });
+    user.password = undefined;
+
+    return res.status(201).json({ user });
   } catch (error) {
     next(error);
   }
@@ -33,6 +51,39 @@ export async function register(req, res, next) {
 export async function login(req, res, next) {
   try {
     // Your code here
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ error: { message: "Must contain email and password" } });
+    }
+
+    // cause select is false explicity select password
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) {
+      return res
+        .status(401)
+        .json({ error: { message: "Invalid credentials" } });
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) {
+      return res
+        .status(401)
+        .json({ error: { message: "Invalid credentials" } });
+    }
+
+    const token = signToken({
+      userId: user._id,
+      email: user.email,
+      role: user.role,
+    });
+
+    user.password = undefined;
+    return res.status(200).json({
+      user,
+      token,
+    });
   } catch (error) {
     next(error);
   }
@@ -47,6 +98,9 @@ export async function login(req, res, next) {
 export async function me(req, res, next) {
   try {
     // Your code here
+    return res.status(200).json({
+      user: req.user,
+    });
   } catch (error) {
     next(error);
   }

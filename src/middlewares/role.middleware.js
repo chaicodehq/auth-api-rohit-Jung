@@ -15,5 +15,19 @@
 export function requireRole(...roles) {
   return (req, res, next) => {
     // Your code here
+    if (!roles || roles.length === 0) {
+      console.log("are you dumb? pass the role goddamnit");
+      return res.status(500).json({ error: { message: "roles not passed" } });
+    }
+
+    if (!req.user || !req.user.role) {
+      return res.status(401).json({ error: { message: "Not authenticated" } });
+    }
+
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ error: { message: "Forbidden" } });
+    }
+
+    next();
   };
 }
